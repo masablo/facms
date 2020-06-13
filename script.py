@@ -1,9 +1,9 @@
 from bs4 import BeautifulSoup as bs
 from datetime import datetime
 import requests
+import asyncio
 import logging
 import logging.config
-# import pickle
 import csv
 import sys
 import yaml
@@ -77,12 +77,12 @@ def get_payload(s):
 
 def login(s):
     payload = get_payload(s)
-    res = s.post(config.WPLOGIN, data=payload, headers=config.HEADER)
+    res = s.post(config.LOGIN, data=payload, headers=config.HEADER)
     soup = bs(res.text, features='lxml')
     logger.info('Login Success!: {}'.format(soup.title.text))
 
 
-def check_today(dates):
+def is_today(dates):
     return len([date for date in dates if 'ago' in date]) is len(dates)
 
 
@@ -91,7 +91,7 @@ def get_index(dates):
     return len(dates) if len(d) is len(dates) else len(d)
 
 
-def extract_article(p):
+def extract_article_meta(p):
     keys = [re.search('post=([0-9]*)', key.find('a').get('href'))[1]
         for key in p.find_all('td', attrs={'data-colname': 'Title'})]
     titles = [title.find('a').text for title in p.find_all('td', attrs={'data-colname': 'Title'})]
@@ -100,14 +100,32 @@ def extract_article(p):
     tags = ['+'.join([tag.text for tag in taglist.find_all('a')])
             for taglist in p.find_all('td', attrs={'data-colname': 'Timeline Tags'})]
     sections = [section.text for section in p.find_all('td', attrs={'data-colname': 'Sections'})]
-    dates = [date.find('span').text for date in p.find_all('td', attrs={'data-colname': 'Date'})]
-    return (keys, titles, authors, kinds, tags, sections, dates)
+    dates = [date.find('span').text for date in p.find_all('td', attrs={'data-colname':'Date'})]
+    return keys, titles, authors, kinds, tags, sections, dates
 
 
-def extract_timeline(p):
+def extract_article(page_index):
+    r = s.get(config.ARTICLE + '?paged={}'.format(page_index), headers=config.HEADER)
+    p = bs(r.text, features='lxml')
+    articles = []
+    (keys, titles, authors, kinds, tags, sections, dates) = extract_article_meta(p)
+    for key, title, author, kind, tag, section, date in zip(keys, titles, authors, kinds, tags, sections, dates):
+        articles.append({'key': key, 'title': title, 'author': author, 'type': kind, 'tag': tag, 'section': section, 'date': date})
+    logger.info('page {} is finished'.format(page_index))
+    return articles
+
+
+def extract_timeline(page_index):
+    r = s.get(config.TIMELINE + '&paged={}'.format(page_index), headers=config.HEADER)
+    p = bs(r.text, features='lxml')
+    timelines = []
     keys = [key.find('strong').text for key in p.find_all('td', attrs={'data-colname': 'Description'})]
     names = [name.find('strong').text for name in p.find_all('td', attrs={'data-colname': 'Timeline Title'})]
-    return (keys, names)
+    for key, name in zip(keys, names):
+        timelines.append({'key': key, 'name': name})
+    logger.info('page {} is finished'.format(page_index))
+    return timelines
+
 
 def export_todays_articles(s):
     logger.info('export_todays_articles')
@@ -120,8 +138,8 @@ def export_todays_articles(s):
     while today:
         r = s.get(config.ARTICLE + '?paged={}'.format(page_index), headers=config.HEADER)
         p = bs(r.text, features='lxml')
-        (keys, titles, authors, kinds, tags, sections, dates) = extract_article(p)
-        today = check_today(dates)
+        (keys, titles, authors, kinds, tags, sections, dates) = extract_article_meta(p)
+        today = is_today(dates)
         index = get_index(dates)
         for i in range(index):
             articles.append([keys[i], titles[i], authors[i], kinds[i], tags[i], sections[i], dates[i]])
@@ -133,42 +151,28 @@ def export_todays_articles(s):
     upload_todays_csv('{}'.format(datetime.today().strftime('%Y-%m-%d')), articles)
 
 
-def export_all_articles(s):
+async def export_all_articles(loop, s):
     logger.info('export_all_articles')
     res = s.get(config.ARTICLE, headers=config.HEADER)
     parse = bs(res.text, features='lxml')
     total = int(parse.find('span', attrs={'class': 'total-pages'}).text)
-    articles = []
-    for i in range(1, total):
-        logger.info('page {} is finished'.format(i))
-        r = s.get(config.ARTICLE + '?paged={}'.format(i), headers=config.HEADER)
-        p = bs(r.text, features='lxml')
-        (keys, titles, authors, kinds, tags, sections, dates) = extract_article(p)
-        for key, title, author, kind, tag, section, date in zip(keys, titles, authors, kinds, tags, sections, dates):
-            articles.append({'key': key,
-                             'title': title,
-                             'author': author,
-                             'type': kind,
-                             'tag': tag,
-                             'section': section,
-                             'date': date})
-    export_csv('articles.csv', ['key', 'title', 'author', 'type', 'tag', 'section', 'date'], articles)
+    async def scraping(page_index):
+        async with asyncio.Semaphore(10):
+            return await loop.run_in_executor(None, extract_article, page_index)
+    articles = [scraping(page_index) for page_index in range(1, total + 1)]
+    return await asyncio.gather(*articles)
 
 
-def export_all_timelines(s):
+async def export_all_timelines(loop, s):
     logger.info('export_all_timelines')
     res = s.get(config.TIMELINE, headers=config.HEADER)
     parse = bs(res.text, features='lxml')
     total = int(parse.find('span', attrs={'class': 'total-pages'}).text)
-    timelines = []
-    for i in range(1, total + 1):
-        logger.info('page {} is finished'.format(i))
-        r = s.get(config.TIMELINE+ '&paged={}'.format(i), headers=config.HEADER)
-        p = bs(r.text, features='lxml')
-        (keys, names) = extract_timeline(p)
-        for key, name in zip(keys, names):
-            timelines.append({'key': key, 'name': name})
-    export_csv('timelines.csv', ['key', 'name'], timelines)
+    async def scraping(page_index):
+        async with asyncio.Semaphore(10):
+            return await loop.run_in_executor(None, extract_timeline, page_index)
+    timelines = [scraping(page_index) for page_index in range(1, total + 1)]
+    return await asyncio.gather(*timelines)
 
 
 if __name__ == '__main__':
@@ -177,9 +181,16 @@ if __name__ == '__main__':
         s = requests.session()
         login(s)
         if arg == 'all':
-            export_all_articles(s)
+            loop = asyncio.get_event_loop()
+            articles = loop.run_until_complete(export_all_articles(loop, s))
+            export_csv('articles.csv', ['key', 'title', 'author', 'type', 'tag', 'section', 'date'], sum(articles, []))
+            sys.exit()
         elif arg == 'timeline':
-            export_all_timelines(s)
+            loop = asyncio.get_event_loop()
+            timelines = loop.run_until_complete(export_all_timelines(loop, s))
+            export_csv('timelines.csv', ['key', 'name'], sum(timelines, []))
+            sys.exit()
         elif arg == 'today':
             export_todays_articles(s)
+            sys.exit()
     logger.error('please give one argument out of three (all, timeline, today)')

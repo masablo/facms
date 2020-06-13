@@ -14,9 +14,7 @@ cat << EOS >> .env
 ID=xxxxxxxx
 PS=xxxxxxxx
 LOGIN=xxxxxxxx
-WPLOGIN=xxxxxxxx
 ARTICLE=xxxxxxxx
-TAG=xxxxxxxx
 UA=xxxxxxxx
 KEY_FILE_LOCATION=/path/to/project-name-xxxxxxx.json
 FOLDER_ID=google_drive_folder_id
@@ -31,7 +29,8 @@ EOS
 
 # Cloud functions use your-project-name@appspot.gserviceaccount.com by default
 # Cron job send a POST request to the Cloud functions
-# curl -X POST "https://YOUR_REGION-YOUR_PROJECT_ID.cloudfunctions.net/FUNCTION_NAME" -H "Content-Type:application/json"
+# curl -X POST "https://YOUR_REGION-YOUR_PROJECT_ID.cloudfunctions.net/FUNCTION_NAME" \
+#      -H "Content-Type:application/json"
 ```
 
 ---
@@ -48,10 +47,10 @@ EOS
 
 [service accounts](https://cloud.google.com/iam/docs/service-accounts?hl=en)
 
-- client_secret.json (Google APIs OAuth 2.0 client ID)
+- client_secret.json (Google APIs OAuth 2.0 client ID - APPLICATION_NAME) -> credentials.json
 - project-name-xxxxxxx.json (Google APIs service accounts)
-  - xxx@appspot.gserviceaccount.com
-  - xxx@project-name.iam.gserviceaccount.com
+  - xxx@appspot.gserviceaccount.com (App Engine default service account)
+  - xxx@project-name.iam.gserviceaccount.com (a user-managed service account)
 
 ### Google Analytics
 
