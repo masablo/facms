@@ -1,5 +1,6 @@
 from bs4 import BeautifulSoup as bs
 from datetime import datetime
+import pandas as pd
 import requests
 import asyncio
 import logging
@@ -18,6 +19,36 @@ logging.config.dictConfig(yaml.load(open("log_conf.yaml").read(), Loader=yaml.Sa
 logger = logging.getLogger(__name__)
 
 
+def get_article_id(article_id):
+    pattern = re.compile('page-([0-9]{{{}}})'.format(config.ARTICLE_ID_LENGTH))
+    return int(re.search(pattern, article_id)[1]) if re.search(pattern, article_id) else None
+    # return int(article_id.replace('page-', '')) if len(article_id.replace('page-', '')) == config.ARTICLE_ID_LENGTH else None
+
+
+def make_report(report_id):
+    timelines = pd.read_csv('./data/timelines.csv')
+    logging.info('timelines is loaded')
+    articles = pd.read_csv('./data/articles.csv')
+    logging.info('articles is loaded')
+    pv = pd.read_csv('./data/analytics/{}.csv'.format(report_id), names=('url', 'pv'))
+    logging.info('{}.csv is loaded'.format(report_id))
+
+    key_name = dict(zip(timelines.key.to_list(), timelines.name.to_list()))
+    key_title = dict(zip(articles.key.to_list(), articles.title.to_list()))
+    article_pv = dict(zip(pv.url[pv.url.str.startswith(config.ARTICLE_PATH)].to_list(), pv.pv[pv.url.str.startswith(config.PATH)].to_list()))
+    data = []
+    head = ['TimelineID', 'TimelineName', 'ArticleID', 'Headline', 'PV']
+    for url in article_pv:
+        path, timeline_id, article_id = url.rsplit('/', 2)
+        data.append({'TimelineID': url,
+                     'TimelineName': key_name.get(timeline_id, 'unknown'),
+                     'ArticleID': get_article_id(article_id) if get_article_id(article_id) else 'unknown',
+                     'Headline': key_title.get(get_article_id(article_id), 'unknown') if get_article_id(article_id) else 'unknown',
+                     'PV': article_pv.get(url)})
+    pv_data = [row for row in data if row['TimelineName'] != 'unknown' and row['Headline'] != 'unknown']
+    export_csv('reports/{}.csv'.format(report_id), head, pv_data)
+
+
 def export_csv(name, head, articles):
     with open('./data/{}'.format(name), 'w') as csv_file:
         header = head
@@ -25,6 +56,7 @@ def export_csv(name, head, articles):
         writer.writeheader()
         for row in articles:
             writer.writerow(row)
+    sys.exit()
 
 
 def make_sheet_in_drive():
@@ -59,6 +91,7 @@ def upload_todays_csv(name, data):
     sheet = make_sheet_in_drive()
     logging.info(sheet.get('id'))
     add_data_to_sheet(sheet, data)
+    sys.exit()
 
 
 def get_payload(s):
@@ -66,8 +99,8 @@ def get_payload(s):
     soup = bs(res.text, features='lxml')
     token = soup.find(attrs={'name': 'testcookie'}).get('value')
     payload = {
-        'log': config.ID,
-        'pwd': config.PS,
+        'log': config.CMS_ID,
+        'pwd': config.CNS_PS,
         'wp-submit': 'Log In',
         'redirect_to': 'https://nikkei-asianreview.express.pugpig.com/wp-admin/',
         'testcookie': token
@@ -104,7 +137,7 @@ def extract_article_meta(p):
     return keys, titles, authors, kinds, tags, sections, dates
 
 
-def extract_article(page_index):
+def extract_article(page_index, s):
     r = s.get(config.ARTICLE + '?paged={}'.format(page_index), headers=config.HEADER)
     p = bs(r.text, features='lxml')
     articles = []
@@ -127,7 +160,7 @@ def extract_timeline(page_index):
     return timelines
 
 
-def export_todays_articles(s):
+def export_todays_articles():
     logger.info('export_todays_articles')
     res = s.get(config.ARTICLE, headers=config.HEADER)
     parse = bs(res.text, features='lxml')
@@ -155,15 +188,16 @@ async def export_all_articles(loop, s):
     logger.info('export_all_articles')
     res = s.get(config.ARTICLE, headers=config.HEADER)
     parse = bs(res.text, features='lxml')
+    logger.info(parse.title.text)
     total = int(parse.find('span', attrs={'class': 'total-pages'}).text)
     async def scraping(page_index):
         async with asyncio.Semaphore(10):
-            return await loop.run_in_executor(None, extract_article, page_index)
+            return await loop.run_in_executor(None, extract_article, page_index, s)
     articles = [scraping(page_index) for page_index in range(1, total + 1)]
     return await asyncio.gather(*articles)
 
 
-async def export_all_timelines(loop, s):
+async def export_all_timelines(loop):
     logger.info('export_all_timelines')
     res = s.get(config.TIMELINE, headers=config.HEADER)
     parse = bs(res.text, features='lxml')
@@ -177,20 +211,18 @@ async def export_all_timelines(loop, s):
 
 if __name__ == '__main__':
     arg = sys.argv[1] if len(sys.argv) == 2 else None
-    if arg in ['all', 'timeline', 'today']:
+    if arg and re.match(r'[0-9]{4}', arg):
+        make_report(arg)
+    elif arg == 'all':
         s = requests.session()
         login(s)
-        if arg == 'all':
-            loop = asyncio.get_event_loop()
-            articles = loop.run_until_complete(export_all_articles(loop, s))
-            export_csv('articles.csv', ['key', 'title', 'author', 'type', 'tag', 'section', 'date'], sum(articles, []))
-            sys.exit()
-        elif arg == 'timeline':
-            loop = asyncio.get_event_loop()
-            timelines = loop.run_until_complete(export_all_timelines(loop, s))
-            export_csv('timelines.csv', ['key', 'name'], sum(timelines, []))
-            sys.exit()
-        elif arg == 'today':
-            export_todays_articles(s)
-            sys.exit()
-    logger.error('please give one argument out of three (all, timeline, today)')
+        loop = asyncio.get_event_loop()
+        articles = loop.run_until_complete(export_all_articles(loop, s))
+        export_csv('articles.csv', ['key', 'title', 'author', 'type', 'tag', 'section', 'date'], sum(articles, []))
+    elif arg == 'timeline':
+        loop = asyncio.get_event_loop()
+        timelines = loop.run_until_complete(export_all_timelines(loop))
+        export_csv('timelines.csv', ['key', 'name'], sum(timelines, []))
+    elif arg == 'today':
+        export_todays_articles()
+    logger.error('please give one argument out of "all", "timeline", "today", "report_id"')
