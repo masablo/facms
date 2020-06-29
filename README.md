@@ -44,12 +44,15 @@ EOS
 # You need to share the google drive folder with the service accounts to create a spredsheet in it
 
 # Cloud functions use your-project-name@appspot.gserviceaccount.com by default
+
 # the default timeout is 60 sec (you can change it up to 540 sec)
+# the default memory is 256MB (you can change it up to 2GB)
+
 # Cron job send a POST request to the Cloud functions
 # curl -X POST "https://YOUR_REGION-YOUR_PROJECT_ID.cloudfunctions.net/FUNCTION_NAME" \
 #      -H "Content-Type:application/json"
 
-gcloud functions deploy main --runtime python37 --trigger-http --timeout=540
+gcloud functions deploy main --runtime python37 --trigger-http --timeout=540 --memory=2048MB
 
 brew install oath-toolkit
 oathtool --totp --base32 [key (32 characters)]
@@ -88,13 +91,17 @@ pip show chromedriver-binary | grep "Version: 83"
 
 ### Cloud Functions
 
+[gcloud functions deploy - create or update a Google Cloud Function](https://cloud.google.com/sdk/gcloud/reference/functions/deploy?hl=en)
+
+[set memory and timeout to cloud functions on Console](https://stackoverflow.com/a/61739391)
+
 [Calling Cloud functions - HTTP Triggers](https://cloud.google.com/functions/docs/calling/http?hl=en)
 
-[Cron Job](https://cron-job.org/)
+- [Cron Job](https://cron-job.org/)
 
-[Google Apps Script - Time-driven triggers](https://developers.google.com/apps-script/guides/triggers/installable#time-driven_triggers)
+- [Google Apps Script - Time-driven triggers](https://developers.google.com/apps-script/guides/triggers/installable#time-driven_triggers)
 
-[CircleCI - Using Workflows to Schedule Jobs](https://circleci.com/docs/2.0/workflows/)
+- [CircleCI - Using Workflows to Schedule Jobs](https://circleci.com/docs/2.0/workflows/)
 
 ### Selenium
 
