@@ -1,3 +1,18 @@
+## TOC
+
+- [setup](https://github.com/masablo/facms#setup)
+
+  - [data_allocation](https://github.com/masablo/facms#data_allocation)
+
+- [references](https://github.com/masablo/facms#references)
+  - [General](https://github.com/masablo/facms#general)
+  - [Google (Firebase) Analytics](https://github.com/masablo/facms#google-analytics)
+  - [Cloud Functions](https://github.com/masablo/facms#cloud-functions)
+  - [Selenium](https://github.com/masablo/facms#selenium)
+  - [Scrapy](https://github.com/masablo/facms#scrapy)
+
+---
+
 ## setup
 
 ### data_allocation
@@ -5,19 +20,24 @@
 ```shell
 pipenv --python 3.7.0
 pipenv shell
-pipenv install requests BeautifulSoup4 lxml pyyaml pandas selenium
-pipenv install oauth2client google-api-python-client google-cloud-storage gspread
-pipenv install "python-dotenv~=0.13.0"
-pipenv install "chromedriver-binary==83.0.4103.39.0"
-# pipenv install scrapy
+pipenv sync --dev
+# pipenv install requests BeautifulSoup4 lxml pyyaml pandas selenium schedule cerberus
+# pipenv install oauth2client google-api-python-client google-cloud-storage gspread
+# pipenv install "python-dotenv~=0.13.0"
+# pipenv install "chromedriver-binary==83.0.4103.39.0"
+# pipenv install scrapy ipython
 # pipenv install --dev tox flake8 autopep8 pytest coverage black==18.9b0
-pip freeze > requirements.txt
+pipenv run pip freeze > requirements.txt
 
 cat << EOS >> .env
 CMS_ID=xxxxxxxx
 CMS_PS=xxxxxxxx
 LOGIN=xxxxxxxx
 ARTICLE=xxxxxxxx
+WEB=xxxxxxxx
+APP=xxxxxxxx
+SLACK_WEBHOOK=https://hooks.slack.com/services/<team_id>/Bxxxxxxxx/xxxxxxxx
+SLACK_PINGME=https://hooks.slack.com/services/<team_id>/Bxxxxxxxx/xxxxxxxx
 UA=xxxxxxxx
 CLIENT_SECRET_FILE=/path/to/client_secret.json
 CREDENTIAL_FILE=/path/to/credentials.json
@@ -57,7 +77,49 @@ gcloud functions deploy main --runtime python37 --trigger-http --timeout=540 --m
 brew install oath-toolkit
 oathtool --totp --base32 [key (32 characters)]
 
-pip show chromedriver-binary | grep "Version: 83"
+brew install telnet
+
+pipenv run pip show chromedriver-binary | grep "Version: 83"
+pipenv run pip list | grep -e Scrapy -e Twisted -e lxml -e pyOpenSSL
+pipenv run pip show requests-html | grep "Requires"
+
+# scrapy project (Global commands)
+scrapy -h
+scrapy startproject [project_name]
+cd gacms
+scrapy genspider -l
+scrapy genspider [-t template_name][spider_name] [domain]
+scrapy settings --get BOT_NAME
+scrapy runspider [spider_module_name.py] [-o output_file_name(.json|.jl)]
+scrapy shell '[domain]' [--nolog]
+scrapy crawl [spider_name] -a [tag_name1=value1] -a [tag_name2=value2]
+scrapy parse [url] --spider [spider_name] -c [spider_method] # call spider_method from the spider to prase a page
+>>> shelp()
+>>> help(scrapy.http.Reuqest)
+>>> response.css('title')
+>>> response.css('title::text').getall()
+>>> response.css('title::text').re(r'')
+>>> response.css('li.next a').attrib['href']
+>>> response.css('li.next a::attr(href)').get()
+>>> response.xpath('//title').get()
+
+# scrapy project (Project-only commands)
+scrapy edit [spider_name]
+scrapy list
+scrapy check -l
+scrapy crawl [spider_name] [-o output_file_name(.json|.jl)]
+scrapy crawl facms -o articles.csv
+
+telnet localhost 6023
+>>> from scrapy.utils.trackref import get_oldest
+>>> from scrapy.utils.trackref import iter_all
+>>> from scrapy.spiders import Spider
+>>> prefs()
+>>> prefs(ignore=Spider)
+>>> r = get_oldest('HtmlResponse')
+>>> r.url
+>>> [r.url for r in iter_all('HtmlResponse')]
+
 ```
 
 ---
@@ -81,7 +143,7 @@ pip show chromedriver-binary | grep "Version: 83"
 
 [Pricing](https://cloud.google.com/pricing/list?hl=en)
 
-### Google Analytics
+### Google (Firebase) Analytics
 
 [Account Explorer for checking the view id](https://ga-dev-tools.appspot.com/account-explorer/)
 
@@ -108,3 +170,34 @@ pip show chromedriver-binary | grep "Version: 83"
 [ChromeDriver - WebDriver for Chrome](https://sites.google.com/a/chromium.org/chromedriver/home)
 
 [Selenium with Python](https://selenium-python.readthedocs.io/)
+
+### Scrapy
+
+[Architecture overview](https://doc.scrapy.org/en/latest/intro/overview.html)
+
+- [Configuration settings](https://doc.scrapy.org/en/latest/topics/commands.html#configuration-settings)
+- [Populating the settings](https://doc.scrapy.org/en/latest/topics/settings.html#populating-the-settings)
+- [scrapy.http.Request.meta](https://doc.scrapy.org/en/latest/topics/request-response.html#scrapy.http.Request.meta)
+- [Request.meta special keys](https://doc.scrapy.org/en/latest/topics/request-response.html#request-meta-special-keys)
+- [Using FormRequest.from_response() to simulate a user login](https://doc.scrapy.org/en/latest/topics/request-response.html#using-formrequest-from-response-to-simulate-a-user-login)
+- [scrapy/itemadapter](https://github.com/scrapy/itemadapter/)
+- [Item Pipeline](https://doc.scrapy.org/en/latest/topics/item-pipeline.html)
+- [Item Exporters](https://doc.scrapy.org/en/latest/topics/exporters.html)
+- [Feed exports](https://doc.scrapy.org/en/latest/topics/feed-exports.html)
+- [Telnet Console](https://doc.scrapy.org/en/latest/topics/telnetconsole.html)
+- [Core API](https://doc.scrapy.org/en/latest/topics/api.html)
+- [Custom Contracts](https://doc.scrapy.org/en/latest/topics/contracts.html#custom-contracts)
+- [Run Scrapy from a script](https://doc.scrapy.org/en/latest/topics/practices.html#run-scrapy-from-a-script)
+- [Avoiding getting banned](https://doc.scrapy.org/en/latest/topics/practices.html#avoiding-getting-banned)
+- [Selecting dynamically-loaded content](https://doc.scrapy.org/en/latest/topics/dynamic-content.html)
+- [Debugging memory leaks](https://doc.scrapy.org/en/latest/topics/leaks.html)
+- [Downloader Middleware](https://doc.scrapy.org/en/latest/topics/downloader-middleware.html)
+- [Spider Middleware](https://doc.scrapy.org/en/latest/topics/spider-middleware.html)
+
+[Splash - A javascript rendering service](https://splash.readthedocs.io/en/stable/)
+
+[Scrapyd](https://scrapyd.readthedocs.io/en/latest/)
+
+[QuotesBot](https://github.com/scrapy/quotesbot)
+
+[The ScrapingHub BLOG](https://blog.scrapinghub.com/)

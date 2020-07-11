@@ -4,6 +4,9 @@
 *.pickle
 client_secret.json
 credential.json
+*.json
+*.csv
+*.db
 data/
 
 # Byte-compiled / optimized / DLL files
