@@ -1,19 +1,19 @@
 ## TOC
 
-- [setup](https://github.com/masablo/facms#setup)
+- [memo](https://github.com/masablo/facms#memo)
 
   - [data_allocation](https://github.com/masablo/facms#data_allocation)
 
 - [references](https://github.com/masablo/facms#references)
   - [General](https://github.com/masablo/facms#general)
-  - [Google (Firebase) Analytics](https://github.com/masablo/facms#google-analytics)
+  - [Google (Firebase) Analytics](https://github.com/masablo/facms#google-firebase-analytics)
   - [Cloud Functions](https://github.com/masablo/facms#cloud-functions)
   - [Selenium](https://github.com/masablo/facms#selenium)
   - [Scrapy](https://github.com/masablo/facms#scrapy)
 
 ---
 
-## setup
+## memo
 
 ### data_allocation
 
@@ -86,7 +86,7 @@ pipenv run pip show requests-html | grep "Requires"
 # scrapy project (Global commands)
 scrapy -h
 scrapy startproject [project_name]
-cd gacms
+cd [project_name]
 scrapy genspider -l
 scrapy genspider [-t template_name][spider_name] [domain]
 scrapy settings --get BOT_NAME
@@ -173,7 +173,7 @@ telnet localhost 6023
 
 ### Scrapy
 
-[Architecture overview](https://doc.scrapy.org/en/latest/intro/overview.html)
+[Architecture overview](https://doc.scrapy.org/en/latest/topics/architecture.html)
 
 - [Configuration settings](https://doc.scrapy.org/en/latest/topics/commands.html#configuration-settings)
 - [Populating the settings](https://doc.scrapy.org/en/latest/topics/settings.html#populating-the-settings)

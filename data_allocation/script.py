@@ -59,7 +59,7 @@ def export_csv(name, head, articles):
     sys.exit()
 
 
-def make_sheet_in_drive():
+def make_sheet_in_drive(name):
     file_metadata = {
         'name': name,
         'parents': [config.FOLDER_ID],
@@ -88,7 +88,7 @@ def add_data_to_sheet(sheet, data):
 
 
 def upload_todays_csv(name, data):
-    sheet = make_sheet_in_drive()
+    sheet = make_sheet_in_drive(name)
     logging.info(sheet.get('id'))
     add_data_to_sheet(sheet, data)
     sys.exit()
@@ -100,7 +100,7 @@ def get_payload(s):
     token = soup.find(attrs={'name': 'testcookie'}).get('value')
     payload = {
         'log': config.CMS_ID,
-        'pwd': config.CNS_PS,
+        'pwd': config.CMS_PS,
         'wp-submit': 'Log In',
         'redirect_to': 'https://nikkei-asianreview.express.pugpig.com/wp-admin/',
         'testcookie': token
@@ -160,10 +160,11 @@ def extract_timeline(page_index):
     return timelines
 
 
-def export_todays_articles():
+def export_todays_articles(s):
     logger.info('export_todays_articles')
     res = s.get(config.ARTICLE, headers=config.HEADER)
     parse = bs(res.text, features='lxml')
+    logger.info(parse.title.text)
     articles = []
     today = True
     page_index = 1
@@ -189,23 +190,24 @@ async def export_all_articles(loop, s):
     res = s.get(config.ARTICLE, headers=config.HEADER)
     parse = bs(res.text, features='lxml')
     logger.info(parse.title.text)
-    total = int(parse.find('span', attrs={'class': 'total-pages'}).text)
+    total = int(parse.find('span', attrs={'class': 'total-pages'}).text) + 1
     async def scraping(page_index):
         async with asyncio.Semaphore(10):
             return await loop.run_in_executor(None, extract_article, page_index, s)
-    articles = [scraping(page_index) for page_index in range(1, total + 1)]
+    articles = [scraping(page_index) for page_index in range(1, total)]
     return await asyncio.gather(*articles)
 
 
-async def export_all_timelines(loop):
+async def export_all_timelines(loop, s):
     logger.info('export_all_timelines')
     res = s.get(config.TIMELINE, headers=config.HEADER)
     parse = bs(res.text, features='lxml')
-    total = int(parse.find('span', attrs={'class': 'total-pages'}).text)
+    logger.info(parse.title.text)
+    total = int(parse.find('span', attrs={'class': 'total-pages'}).text) + 1
     async def scraping(page_index):
         async with asyncio.Semaphore(10):
             return await loop.run_in_executor(None, extract_timeline, page_index)
-    timelines = [scraping(page_index) for page_index in range(1, total + 1)]
+    timelines = [scraping(page_index) for page_index in range(1, total)]
     return await asyncio.gather(*timelines)
 
 
@@ -220,9 +222,13 @@ if __name__ == '__main__':
         articles = loop.run_until_complete(export_all_articles(loop, s))
         export_csv('articles.csv', ['key', 'title', 'author', 'type', 'tag', 'section', 'date'], sum(articles, []))
     elif arg == 'timeline':
+        s = requests.session()
+        login(s)
         loop = asyncio.get_event_loop()
-        timelines = loop.run_until_complete(export_all_timelines(loop))
+        timelines = loop.run_until_complete(export_all_timelines(loop, s))
         export_csv('timelines.csv', ['key', 'name'], sum(timelines, []))
     elif arg == 'today':
-        export_todays_articles()
+        s = requests.session()
+        login(s)
+        export_todays_articles(s)
     logger.error('please give one argument out of "all", "timeline", "today", "report_id"')

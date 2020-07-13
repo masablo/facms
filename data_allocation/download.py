@@ -67,7 +67,7 @@ def login(driver):
     driver.implicitly_wait(10)
 
 
-def download_data():
+def initialize():
     chromeOptions = webdriver.ChromeOptions()
     options = get_options(chromeOptions)
     options.add_experimental_option("prefs", {"download.default_directory": './data/analytics/',
@@ -85,6 +85,10 @@ def download_data():
     driver = webdriver.Chrome(options=options)
     change_download_folder(driver)
     login(driver)
+    return driver
+
+
+def download_file(driver):
     query = urllib.parse.urlencode({'params': '_u..nav%3Dga1-experimental',
                                     '_r.explorerCard..selmet': '["screenPageViews"]',
                                     '_r.explorerCard..seldim': '["unifiedScreenName"]',
@@ -105,6 +109,7 @@ def download_data():
     WebDriverWait(driver, MAX_WAIT_TIME).until(EC.presence_of_element_located((By.XPATH, export_button)))
     driver.find_element_by_xpath(export_button).click()
     time.sleep(5)
+    driver.close()
 
 
 if __name__ == '__main__':
@@ -121,5 +126,5 @@ if __name__ == '__main__':
     csv_share = '//button[contains(@class, "button-goto-export")]'
     export_button = '//button[contains(@class, "button-export-csv")]'
 
-    download_data()
-
+    driver = initialize()
+    download_file(driver)

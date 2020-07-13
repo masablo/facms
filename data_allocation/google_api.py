@@ -22,7 +22,7 @@ def get_service(api_name, api_version, scopes):
     """
     key_file_location = config.GKEY
     credentials = ServiceAccountCredentials.from_json_keyfile_name(key_file_location, scopes=scopes)
-    service = build(api_name, api_version, credentials=credentials)
+    service = build(api_name, api_version, credentials=credentials, cache_discovery=False)
     return service
 
 
