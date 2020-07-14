@@ -11,7 +11,7 @@ import re
 import schedule, time
 
 
-logging.config.dictConfig(yaml.load(open("log_conf.yaml").read(), Loader=yaml.SafeLoader))
+logging.config.dictConfig(yaml.load(open("../log_conf.yaml").read(), Loader=yaml.SafeLoader))
 logger = logging.getLogger(__name__)
 
 
@@ -360,8 +360,8 @@ def job():
 
 
 def main():
-    # schedule.every(6).minutes.do(job)
-    schedule.every(30).seconds.do(job)
+    schedule.every(6).minutes.do(job)
+    # schedule.every(30).seconds.do(job)
     while True:
         schedule.run_pending()
         time.sleep(1)

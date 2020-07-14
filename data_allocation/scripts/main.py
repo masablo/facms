@@ -15,7 +15,7 @@ import re
 from google_api import get_service
 
 
-logging.config.dictConfig(yaml.load(open("log_conf.yaml").read(), Loader=yaml.SafeLoader))
+logging.config.dictConfig(yaml.load(open("../log_conf.yaml").read(), Loader=yaml.SafeLoader))
 logger = logging.getLogger(__name__)
 
 
